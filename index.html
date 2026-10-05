@@ -8,100 +8,118 @@
 <meta name="theme-color" content="#000000">
 <meta property="og:title" content="ticktok">
 <meta property="og:description" content="every ticker gets a tok.">
-<meta property="og:image" content="/assets/img/og.jpg">
+<meta property="og:image" content="https://ticktok-pad.vercel.app/assets/img/og.jpg">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/favicon.ico?v=1" sizes="any">
 <link rel="icon" type="image/png" sizes="64x64" href="/assets/img/fav-64.png?v=1">
 <link rel="apple-touch-icon" href="/assets/img/fav-180.png?v=1">
 <link rel="preload" href="/assets/fonts/Poppins-Black.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/fonts/Poppins-SemiBold.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/css/tt.css?v=1">
+<link rel="stylesheet" href="/assets/css/tt.css?v=3">
 </head>
 <body>
-<div class="app">
-  <aside class="side">
-    <a class="logo" href="#/" aria-label="ticktok"><span class="c">ticktok</span><span class="p">ticktok</span></a>
-    <nav class="snav" aria-label="Sections">
-      <a href="#/" data-v="feed"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/></svg>For You</a>
-      <a href="#/launch" data-v="launch"><svg viewBox="0 0 24 24"><path d="M11 4h2v7h7v2h-7v7h-2v-7H4v-2h7z"/></svg>Launch</a>
-      <a href="#/viewers" data-v="viewers"><svg viewBox="0 0 24 24"><path d="M12 5C6.5 5 2.7 9.4 1.5 12c1.2 2.6 5 7 10.5 7s9.3-4.4 10.5-7C21.3 9.4 17.5 5 12 5zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/></svg>Viewers</a>
-      <a href="#/how" data-v="how"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-6h2zm0-8h-2V7h2z"/></svg>How it works</a>
-    </nav>
-    <button class="wallet" id="walletBtn" type="button"><i></i><span>connect</span></button>
-    <div class="ca" id="caBox" hidden></div>
-    <div class="sfoot"><b id="bornN">0</b> coins born on pump.fun since you got here</div>
-  </aside>
+<header class="top" id="top">
+  <a class="logo" href="#" aria-label="ticktok"><span class="c">ticktok</span><span class="p">ticktok</span></a>
+  <nav class="tnav" aria-label="Sections"><a href="#foryou">For You</a><a href="#launch">Launch</a><a href="#fresh">New coins</a><a href="#viewers">Viewers</a><a href="#how">How</a></nav>
+  <button class="wallet" id="walletBtn" type="button"><i></i><span>connect</span></button>
+</header>
 
-  <main class="main">
-    <section class="view" id="v-feed"><div class="feed" id="feed"></div></section>
-
-    <section class="view pane" id="v-launch" hidden>
-      <div class="lgrid">
-        <div class="lform">
-          <h1 class="vh">Launch a <span class="gl" data-t="tok">tok</span></h1>
-          <p class="vs">Your coin is born on pump.fun with its own tok: a video made right here in your browser, ready to post anywhere. Make it first, launch when it looks right.</p>
-          <label class="fld"><span>what is it</span><textarea class="in" id="line" maxlength="300" rows="2" placeholder="a frog who reviews energy drinks at 3am"></textarea></label>
-          <div class="two"><label class="fld"><span>name</span><input class="in" id="nm" maxlength="32" placeholder="Wick" spellcheck="false"></label><label class="fld"><span>ticker</span><input class="in" id="tk" maxlength="10" placeholder="WICK" spellcheck="false" autocapitalize="characters"></label></div>
-          <label class="fld"><span>caption <em>on the first tok</em></span><input class="in" id="cap" maxlength="80" placeholder="pov: your coin just got a tok" spellcheck="false"></label>
-          <div class="fld"><span>look</span><div class="chips" id="looks"><button type="button" class="chip on" data-l="glitch">glitch</button><button type="button" class="chip" data-l="chart">chart</button><button type="button" class="chip" data-l="hearts">hearts</button><button type="button" class="chip" data-l="zoom">zoom</button><button type="button" class="chip ghost" id="reroll">new colors ↻</button></div></div>
-          <label class="fld"><span>its X <em>optional</em></span><input class="in" id="xh" maxlength="16" placeholder="@" spellcheck="false"></label>
-          <div class="fld"><span>first buy <em>optional</em></span><div class="chips" id="buyBox"></div></div>
-          <div class="fld"><span>fees, locked on pump.fun</span><div class="split" id="split"></div></div>
-          <button class="btn acc big" id="goBtn" type="button">Connect wallet to launch</button>
-          <div class="lsteps" id="goProg" hidden></div>
-          <p class="status" id="goStatus" role="status"></p>
-          <div id="goRes" hidden></div>
-        </div>
-        <div class="lprev">
-          <div class="phone"><canvas id="pv"></canvas><div class="pvui"><b id="pvName">@yourcoin</b><span>♪ original sound – <i id="pvSym">$TICKER</i></span></div></div>
-          <button class="btn line" id="dlBtn" type="button">Download this tok</button>
-          <p class="status center" id="dlStatus" role="status"></p>
-        </div>
+<main>
+  <section class="hero">
+    <div class="wrap hgrid">
+      <div class="htext">
+        <p class="kick"><i id="kDot"></i><span id="kTxt">$TICKTOK · on solana</span></p>
+        <h1 class="hw"><span class="gl" data-t="every ticker">every ticker</span><br>gets a tok.</h1>
+        <p class="hsub">Launch a coin on pump.fun and it’s born with its own tok: a vertical video made in your browser, ready to post anywhere. The best coin gets pushed to the top every hour.</p>
+        <div class="hcta"><a class="btn acc big2" href="#launch">Launch a coin</a><a class="btn line big2" href="#foryou">Watch For You</a></div>
+        <div class="ca" id="caBox" hidden></div>
       </div>
-    </section>
+      <div class="hphones">
+        <div class="ph ph-l"><canvas id="h1"></canvas><span class="phl" id="h1l">just born on pump.fun</span></div>
+        <div class="ph ph-c"><canvas id="h0"></canvas></div>
+        <div class="ph ph-r"><canvas id="h2"></canvas><span class="phl" id="h2l">just born on pump.fun</span></div>
+      </div>
+    </div>
+    <div class="ticker"><div class="tl"><i id="tDot"></i><b id="bornN">0</b>&nbsp;coins born on pump.fun since you got here</div><div class="tr"><div class="tt" id="tape"><span>connecting to pump.fun…</span></div></div></div>
+  </section>
 
-    <section class="view pane" id="v-viewers" hidden>
-      <h1 class="vh">Be a <span class="gl" data-t="first viewer">first viewer</span></h1>
-      <p class="vs">Burn $TICKTOK to start watching. Every new coin draws 8 first viewers, and longer viewers get more tickets. First viewers share 15% of that coin’s creator fees forever, paid by pump.fun itself.</p>
-      <div class="ladder" id="ladder"></div>
-      <div class="vgrid"><div class="card" id="me"></div><div class="card" id="vtop"></div></div>
-    </section>
+  <section class="sec" id="foryou">
+    <div class="wrap">
+      <div class="sh reveal"><div><p class="eye">01 · for you</p><h2 class="h2">Every coin, <span class="gl" data-t="one tok">one tok</span>.</h2></div><div class="tabs" id="sorts"><button type="button" data-s="hot" class="on">Hot</button><button type="button" data-s="new">New</button><button type="button" data-s="likes">Most liked</button></div></div>
+      <div class="rowwrap"><div class="row" id="feed"></div><button class="arr al" id="aL" type="button" aria-label="Scroll left">‹</button><button class="arr ar" id="aR" type="button" aria-label="Scroll right">›</button></div>
+    </div>
+  </section>
 
-    <section class="view pane" id="v-how" hidden>
-      <h1 class="vh">How the <span class="gl" data-t="algorithm">algorithm</span> works</h1>
-      <div class="steps">
-        <div class="step"><b>01</b><h3>Launch</h3><p>One line, a name, a ticker, a look. Your coin launches on pump.fun from your own wallet, born with its own tok, made in your browser.</p></div>
+  <section class="sec dark" id="launch">
+    <div class="wrap lgrid">
+      <div class="lform reveal">
+        <p class="eye">02 · launch</p>
+        <h2 class="h2">Make the tok. <span class="gl" data-t="Launch the coin.">Launch the coin.</span></h2>
+        <label class="fld"><span>what is it</span><textarea class="in" id="line" maxlength="300" rows="2" placeholder="a frog who reviews energy drinks at 3am"></textarea></label>
+        <div class="two"><label class="fld"><span>name</span><input class="in" id="nm" maxlength="32" placeholder="Wick" spellcheck="false"></label><label class="fld"><span>ticker</span><input class="in" id="tk" maxlength="10" placeholder="WICK" spellcheck="false" autocapitalize="characters"></label></div>
+        <label class="fld"><span>caption <em>on its first tok</em></span><input class="in" id="cap" maxlength="80" placeholder="pov: your coin just got a tok" spellcheck="false"></label>
+        <div class="fld"><span>look</span><div class="chips" id="looks"><button type="button" class="chip on" data-l="glitch">glitch</button><button type="button" class="chip" data-l="chart">chart</button><button type="button" class="chip" data-l="hearts">hearts</button><button type="button" class="chip" data-l="zoom">zoom</button><button type="button" class="chip ghost" id="reroll">new colors ↻</button></div></div>
+        <label class="fld"><span>its X <em>optional</em></span><input class="in" id="xh" maxlength="16" placeholder="@" spellcheck="false"></label>
+        <div class="fld"><span>first buy <em>optional</em></span><div class="chips" id="buyBox"></div></div>
+        <div class="fld"><span>fees, locked on pump.fun</span><div class="split" id="split"></div></div>
+        <button class="btn acc big" id="goBtn" type="button">Connect wallet to launch</button>
+        <div class="lsteps" id="goProg" hidden></div>
+        <p class="status" id="goStatus" role="status"></p>
+        <div id="goRes" hidden></div>
+      </div>
+      <div class="lprev reveal">
+        <div class="phone"><canvas id="pv"></canvas><div class="pvui"><b id="pvName">@yourcoin</b><span>♪ original sound – <i id="pvSym">$TICKER</i></span></div></div>
+        <button class="btn line" id="dlBtn" type="button">Download this tok</button>
+        <p class="status center" id="dlStatus" role="status"></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="fresh">
+    <div class="wrap">
+      <div class="sh reveal"><div><p class="eye">03 · new on pump.fun</p><h2 class="h2">Tap any new coin. <span class="gl" data-t="Get its tok.">Get its tok.</span></h2></div></div>
+      <div class="fresh" id="births"><p class="mut">Connecting to pump.fun…</p></div>
+    </div>
+  </section>
+
+  <section class="sec dark" id="viewers">
+    <div class="wrap">
+      <div class="reveal"><p class="eye">04 · viewers</p>
+      <h2 class="h2">Be a <span class="gl" data-t="first viewer">first viewer</span>.</h2></div>
+      <p class="lede reveal">Burn $TICKTOK to start watching. Every new coin draws 8 first viewers, and longer viewers get more tickets. First viewers share 15% of that coin’s creator fees forever, paid by pump.fun’s own fee sharing.</p>
+      <div class="ladder stg" id="ladder"></div>
+      <div class="vgrid reveal"><div class="card" id="me"></div><div class="card" id="vtop"></div></div>
+    </div>
+  </section>
+
+  <section class="sec" id="how">
+    <div class="wrap">
+      <div class="reveal"><p class="eye">05 · how it works</p>
+      <h2 class="h2">The <span class="gl" data-t="algorithm">algorithm</span>, in four steps.</h2></div>
+      <div class="steps stg">
+        <div class="step"><b>01</b><h3>Launch</h3><p>One line, a name, a ticker, a look. It launches on pump.fun from your own wallet in one signature, born with its own tok.</p></div>
         <div class="step"><b>02</b><h3>It posts</h3><p>Every six hours while it trades, it writes a new caption for a new tok. Comment on it and it replies.</p></div>
-        <div class="step"><b>03</b><h3>The push</h3><p>Every hour the algorithm pushes one coin to the top of For You with a fresh tok: the most likes in six hours, plus 20 if it’s trading.</p></div>
+        <div class="step"><b>03</b><h3>The push</h3><p>Every hour one coin goes to the top of For You with a fresh tok: the most likes in six hours, plus a boost if it’s trading.</p></div>
         <div class="step"><b>04</b><h3>Viewers</h3><p>8 $TICKTOK viewers are drawn as each new coin’s first viewers and share 15% of its fees forever.</p></div>
       </div>
-      <div class="splitx"><div><b>70%</b><span>launcher</span></div><div><b>15%</b><span>8 first viewers</span></div><div><b>15%</b><span>the house</span></div></div>
-      <div class="faq">
-        <details><summary>Who holds the money?</summary><p>Nobody here. pump.fun’s own fee sharing splits every creator fee, locked in the same signatures that create the coin. Before you sign, this page reads the transactions and stops if the split isn’t the one shown. Anyone can push waiting fees out to everyone with one click.</p></details>
+      <div class="splitx reveal"><div><b>70%</b><span>launcher</span></div><div><b>15%</b><span>8 first viewers</span></div><div><b>15%</b><span>the house</span></div></div>
+      <div class="faq reveal">
+        <details><summary>Who holds the money?</summary><p>Nobody here. pump.fun’s own fee sharing splits every creator fee, locked in the same signatures that create the coin. Before you sign, the page reads the transactions and stops if the split isn’t the one shown. Anyone can push waiting fees out to everyone with one click.</p></details>
         <details><summary>How are first viewers drawn?</summary><p>The moment a coin is recorded, up to 8 $TICKTOK viewers are drawn, seeded by Solana’s latest finalized blockhash. Tickets: new 1x, regular 1.5x (day 3), fan 2x (day 10), day one 3x (day 30). Until anyone has joined, the viewers’ 15% stays with the launcher.</p></details>
-        <details><summary>What happens if a viewer sells?</summary><p>They stop watching. If a wallet’s $TICKTOK drops below what it held right after joining, it leaves the draw. Coins it was already a first viewer of keep paying it.</p></details>
-        <details><summary>Can I post the toks on TikTok?</summary><p>Yes. Every tok downloads as a real video, made right in your browser. Post it anywhere.</p></details>
-        <details><summary>When does a coin go quiet or die?</summary><p>Six hours without a trade and it goes quiet. A week without a trade and it’s dead. One trade brings it back.</p></details>
+        <details><summary>What if a viewer sells?</summary><p>They stop watching. If a wallet’s $TICKTOK drops below what it held right after joining, it leaves the draw. Coins it was already a first viewer of keep paying it.</p></details>
+        <details><summary>Can I post the toks on TikTok?</summary><p>Yes. Every tok downloads as a real video file, made right in your browser. Post it anywhere.</p></details>
+        <details><summary>When does a coin go quiet?</summary><p>Six hours without a trade and it goes quiet. A week without a trade and it’s dead. One trade brings it back.</p></details>
       </div>
-    </section>
-  </main>
-
-  <aside class="panel" id="panel">
-    <div class="pbox" id="detail"></div>
-    <div class="pbox"><h4><i class="dot"></i>new on pump.fun · tap to tok it</h4><div class="births" id="births"><p class="mut">connecting…</p></div></div>
-  </aside>
-
-  <nav class="tabbar" aria-label="Sections">
-    <a href="#/" data-v="feed">For You</a><a href="#/launch" data-v="launch" class="plus"><span>+</span></a><a href="#/viewers" data-v="viewers">Viewers</a><a href="#/how" data-v="how">How</a>
-  </nav>
-</div>
+    </div>
+  </section>
+</main>
 <span id="live-sr" class="sr" aria-live="polite"></span>
 <div class="sheet-w" id="sheet" hidden><div class="boxw" role="dialog" aria-modal="true" aria-labelledby="sheetTitle"><div class="bar2"><span id="sheetTitle"></span><button class="x" id="sheetX" type="button" aria-label="Close">×</button></div><div class="inner" id="sheetBody"></div></div></div>
 <div class="toast" id="toast" role="status"></div>
-<script src="/assets/js/core.js?v=1"></script>
-<script src="/assets/js/live.js?v=1"></script>
-<script src="/assets/js/tok.js?v=1"></script>
-<script src="/assets/js/cross.js?v=1"></script>
-<script src="/assets/js/app.js?v=1"></script>
+<script src="/assets/js/core.js?v=3"></script>
+<script src="/assets/js/live.js?v=3"></script>
+<script src="/assets/js/tok.js?v=3"></script>
+<script src="/assets/js/cross.js?v=3"></script>
+<script src="/assets/js/app.js?v=3"></script>
 </body>
 </html>
