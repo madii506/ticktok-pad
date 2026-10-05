@@ -249,3 +249,5 @@ textarea.in{resize:vertical}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 .pbox:empty{display:none}
+.vid .empty{position:absolute;left:0;right:0;bottom:8%;display:grid;justify-items:center;gap:12px;text-align:center;padding:0 20px}
+.vid .empty span{font:500 13px/1.4 PM;color:rgba(255,255,255,.75)}
