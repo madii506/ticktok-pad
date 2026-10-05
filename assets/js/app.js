@@ -1,107 +1,110 @@
-// ticktok: the For You feed, launching, viewers, and every coin's details, in one page.
+// ticktok: one scrolling page. Hero, For You, launch, new pump.fun coins, viewers, how it works.
 (function () {
   'use strict';
   const C = window.Core, $ = C.$, $$ = C.$$, esc = C.esc;
   const ICON = {
     heart: '<svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.1 0 3.6 1.1 5.3 3.1 1.7-2 3.2-3.1 5.3-3.1 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z"/></svg>',
-    cmt: '<svg viewBox="0 0 24 24"><path d="M12 3C6.5 3 2.5 6.6 2.5 11c0 2.4 1.2 4.5 3.1 6l-.8 3.6 3.9-2c1 .3 2.1.4 3.3.4 5.5 0 9.5-3.6 9.5-8s-4-8-9.5-8z"/></svg>',
     share: '<svg viewBox="0 0 24 24"><path d="M14 4v4C7 8.5 3.5 12.6 3 19c2.2-3.3 5.4-4.9 11-5v4l7-7z"/></svg>',
     dl: '<svg viewBox="0 0 24 24"><path d="M11 3h2v9.2l3.3-3.3 1.4 1.4L12 16 6.3 10.3l1.4-1.4 3.3 3.3zM4 18h16v2H4z"/></svg>',
   };
   const LABEL = { alive: 'live', asleep: 'quiet', dead: 'dead', ascended: 'graduated', unborn: 'not live yet' };
-  const S = { board: null, active: null, players: new Map(), liked: C.store.get('tt-liked') || {}, look: 'glitch', seed: Tok.newSeed(), focus: null, kid: new Map() };
+  const S = { board: null, sort: 'hot', liked: C.store.get('tt-liked') || {}, look: 'glitch', seed: Tok.newSeed(), kid: new Map(), players: new Map() };
   const fmt = n => (n == null ? '0' : n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'K' : String(n));
   const pushedNow = k => k.pushed_at && Date.now() - new Date(k.pushed_at) < 36e5;
   const optOf = k => ({ seed: k.seed, look: k.look, symbol: k.symbol, caption: k.caption || k.line, state: k.state });
   const usd = k => (k.mcap_sol != null && S.board && S.board.solUsd ? C.usd(k.mcap_sol * S.board.solUsd) : '—');
+  const coins = () => (S.board && S.board.coins) || [];
+  const coinOf = m => coins().find(k => k.mint === m);
+  const symOf = b => String(b.symbol || 'TICKER').replace(/[^A-Za-z0-9]/g, '').slice(0, 10).toUpperCase() || 'TICKER';
+  const anyOpt = b => { const s = symOf(b); return { seed: b.mint, look: Tok.LOOKS[(b.mint || '').charCodeAt(5) % 4 || 0], symbol: s, caption: `pov: $${s} just got a tok` }; };
+  const seen = (el, on, off, th) => { if (!('IntersectionObserver' in window)) { on(); return; } new IntersectionObserver(es => es.forEach(e => (e.isIntersecting ? on() : off && off())), { threshold: th || 0 }).observe(el); };
 
-  // ---------- views ----------
-  function route() {
-    const m = location.pathname.match(/^\/c\/([1-9A-HJ-NP-Za-km-z]{32,44})/);
-    if (m) S.focus = m[1];
-    const v = (location.hash.replace(/^#\/?/, '') || 'feed').split('/')[0];
-    const view = ['launch', 'viewers', 'how'].includes(v) ? v : 'feed';
-    $$('.view').forEach(x => { x.hidden = x.id !== 'v-' + view; });
-    $$('.snav a, .tabbar a').forEach(a => a.classList.toggle('on', a.dataset.v === view));
-    if (view === 'feed') resume(); else pauseAll();
-    if (view === 'launch') startPreview(); else stopPreview();
-    if (view === 'viewers') { ladder(); me(); vtop(); }
+  // ---------- nav: the section you're in lights up ----------
+  if ('IntersectionObserver' in window) {
+    const links = $$('.tnav a');
+    const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) links.forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + e.target.id)); }), { rootMargin: '-45% 0px -50% 0px' });
+    $$('main section[id]').forEach(s => io.observe(s));
   }
-  addEventListener('hashchange', route);
 
-  // ---------- the feed ----------
-  const order = ks => ks.slice().sort((a, b) => {
-    const s = k => (pushedNow(k) ? 1e9 : 0) + (k.likes || 0) * 3 + (k.state === 'alive' || k.state === 'ascended' ? 20 : 0) - (k.state === 'dead' ? 60 : 0);
-    return s(b) - s(a) || new Date(b.born_at) - new Date(a.born_at);
-  });
-  function itemHtml(k) {
-    return `<article class="it" data-m="${k.mint}"><div class="stage"><div class="vid"><canvas></canvas>
-      <div class="badges">${pushedNow(k) ? '<span class="pushed">pushed by the algorithm</span>' : ''}<span class="stp ${k.state}"><i></i>${LABEL[k.state] || k.state}</span></div>
-      <div class="info"><b>@${esc(k.name)}</b><div class="ln">${esc(k.caption || k.line || '')}</div><div class="snd">♪<div class="mq"><span>original sound – $${esc(k.symbol)}</span><span>original sound – $${esc(k.symbol)}</span></div></div></div></div>
-      <div class="rail"><a class="ava" href="/c/${k.mint}" title="${esc(k.name)}"><canvas></canvas><i>+</i></a>
-        <button class="rb like ${S.liked[k.mint] ? 'on' : ''}" type="button" aria-label="Like"><span class="ic">${ICON.heart}</span><span class="n">${fmt(k.likes)}</span></button>
-        <button class="rb cmt" type="button" aria-label="Replies"><span class="ic">${ICON.cmt}</span><span>reply</span></button>
-        <button class="rb shr" type="button" aria-label="Share"><span class="ic">${ICON.share}</span><span>share</span></button>
-        <button class="rb dl" type="button" aria-label="Download the tok"><span class="ic">${ICON.dl}</span><span>save</span></button>
-        <div class="disc"><span></span></div></div></div></article>`;
-  }
+  // ---------- hero: three phones ----------
   const INTRO = { seed: 'ticktok', look: 'glitch', symbol: 'TICKTOK', caption: 'every ticker gets a tok.' };
-  function introHtml() {
-    return `<article class="it" data-m="intro"><div class="stage"><div class="vid"><canvas></canvas>
-      <div class="empty"><a class="btn acc" href="#/launch">Launch the first coin</a><span>No coins yet. For You fills up as coins launch.</span></div></div></div></article>`;
+  const HERO = [INTRO, { seed: 'ticktok-2', look: 'chart', symbol: 'TICKTOK', caption: 'pov: your coin got a tok' }, { seed: 'ticktok-3', look: 'hearts', symbol: 'TICKTOK', caption: 'the algorithm picked you.' }];
+  const hp = []; let heroOn = false;
+  function heroPlay() { if (heroOn) return; heroOn = true; Tok.ready().then(() => ['#h0', '#h1', '#h2'].forEach((id, i) => { if (!hp[i]) hp[i] = Tok.play($(id), HERO[i]); })); }
+  function heroStop() { heroOn = false; hp.forEach((p, i) => { if (p) { p.stop(); hp[i] = null; } }); }
+  seen($('.hero'), heroPlay, heroStop);
+  let swapAt = 0, side = 0;
+  function heroBirth(b) {
+    if (Date.now() - swapAt < 6000) return; swapAt = Date.now();
+    const i = 1 + side; side = 1 - side; const o = anyOpt(b);
+    HERO[i] = o; if (hp[i]) hp[i].set(o);
+    const ph = $('#h' + i).parentNode; ph.classList.remove('flip'); void ph.offsetWidth; ph.classList.add('flip');
+    $('#h' + i + 'l').textContent = '$' + o.symbol + ' · just born on pump.fun';
+    ph.onclick = () => tokAny(b);
   }
-  const howOf = m => (m === 'intro' ? INTRO : null);
-  const coinOf = m => (S.board && S.board.coins || []).find(k => k.mint === m);
+  $('#h1l').textContent = ''; $('#h2l').textContent = '';
+
+  // ---------- For You: real coins only, a row you swipe ----------
+  function sorted(ks) {
+    const a = ks.slice(), t = k => new Date(k.born_at || 0).getTime();
+    if (S.sort === 'new') return a.sort((x, y) => t(y) - t(x));
+    if (S.sort === 'likes') return a.sort((x, y) => (y.likes || 0) - (x.likes || 0) || t(y) - t(x));
+    const s = k => (pushedNow(k) ? 1e9 : 0) + (k.likes || 0) * 3 + (k.state === 'alive' || k.state === 'ascended' ? 20 : 0) - (k.state === 'dead' ? 60 : 0);
+    return a.sort((x, y) => s(y) - s(x) || t(y) - t(x));
+  }
+  function cardHtml(k, i) {
+    return `<article class="tk" data-m="${k.mint}" style="--i:${Math.min(i, 8)}"><div class="tv"><canvas></canvas>
+      <div class="badges">${pushedNow(k) ? '<span class="pushed">pushed</span>' : ''}<span class="stp ${k.state}"><i></i>${LABEL[k.state] || k.state}</span></div>
+      <div class="tinfo"><b>@${esc(k.name)}</b><span>${esc(k.caption || k.line || '')}</span></div></div>
+      <div class="tmeta"><span class="sym">$${esc(k.symbol)}</span><button class="lk ${S.liked[k.mint] ? 'on' : ''}" type="button" aria-label="Like">${ICON.heart}<span class="n">${fmt(k.likes)}</span></button></div></article>`;
+  }
+  let noneP = null;
   function feed() {
-    pauseAll(); S.players.clear();
-    const ks = order((S.board && S.board.coins) || []), el = $('#feed');
-    el.innerHTML = ks.length ? ks.map(itemHtml).join('') : introHtml();
-    $$('.it', el).forEach(it => {
-      const m = it.dataset.m, k = howOf(m) ? null : coinOf(m), o = k ? optOf(k) : (howOf(m) || INTRO);
-      Tok.still(it.querySelector('.vid canvas'), o);
-      const like = it.querySelector('.like'); if (like) like.onclick = () => doLike(m, like);
-      const sh = it.querySelector('.shr'); if (sh) sh.onclick = () => share(k);
-      const dl = it.querySelector('.dl'); if (dl) dl.onclick = e => save(o, e.currentTarget);
-      const av = it.querySelector('.ava canvas'); if (av) Tok.still(av, { seed: o.seed, look: 'glitch', symbol: o.symbol });
-      const cm = it.querySelector('.cmt'); if (cm) cm.onclick = () => openDetail(m, true);
-      const v = it.querySelector('.vid'); let lastTap = 0;
-      const tap = (x, y) => { if (!k) return; burst(v, x, y); if (!S.liked[m]) doLike(m, like); else pop(like); };
-      v.addEventListener('dblclick', e => { const r = v.getBoundingClientRect(); tap(e.clientX - r.left, e.clientY - r.top); });
-      v.addEventListener('touchend', e => { const now = Date.now(); if (now - lastTap < 300) { const t = e.changedTouches[0], r = v.getBoundingClientRect(); tap(t.clientX - r.left, t.clientY - r.top); } lastTap = now; }, { passive: true });
+    S.players.forEach(p => p.stop()); S.players.clear(); if (noneP) { noneP.stop(); noneP = null; }
+    const ks = sorted(coins()), el = $('#feed'), wrap = el.parentNode;
+    el.classList.toggle('empty', !ks.length); wrap.classList.toggle('none-w', !ks.length);
+    if (!ks.length) {
+      el.innerHTML = `<div class="none"><div class="nph"><canvas id="noneCv"></canvas></div><div><h3>No coins yet.</h3><p>For You fills up as coins launch here. The first one has the whole feed to itself.</p><a class="btn acc" href="#launch">Launch the first coin</a></div></div>`;
+      Tok.ready().then(() => { noneP = Tok.play($('#noneCv'), { seed: 'first', look: 'zoom', symbol: 'YOURS', caption: 'this spot is open.' }); });
+      return;
+    }
+    el.innerHTML = ks.map(cardHtml).join('');
+    $$('.tk', el).forEach(it => {
+      const m = it.dataset.m, k = coinOf(m);
+      Tok.still(it.querySelector('canvas'), optOf(k));
+      it.addEventListener('click', e => { if (e.target.closest('.lk')) return; openCoin(m); });
+      const lk = it.querySelector('.lk'); lk.onclick = () => doLike(m, lk);
+      cio && cio.observe(it);
     });
-    io && $$('.it', el).forEach(it => io.observe(it));
-    if (ks.length) Live.watch(ks.filter(k => k.state !== 'ascended').map(k => k.mint));
-    if (S.focus) { const it = el.querySelector(`[data-m="${S.focus}"]`); if (it) { it.scrollIntoView(); openDetail(S.focus, false); } else loadDetail(S.focus).then(() => renderDetail(S.focus)); }
+    Live.watch(ks.filter(k => k.state !== 'ascended').map(k => k.mint));
+    arrows();
   }
-  const io = 'IntersectionObserver' in window ? new IntersectionObserver(es => es.forEach(e => {
+  const cio = 'IntersectionObserver' in window ? new IntersectionObserver(es => es.forEach(e => {
     const it = e.target, m = it.dataset.m;
-    if (e.isIntersecting && e.intersectionRatio > .6) { playItem(it); if (!howOf(m)) { S.active = m; renderDetail(m); loadDetail(m).then(() => { if (S.active === m) renderDetail(m); }); } }
-    else stopItem(it);
-  }), { threshold: [0, .6, 1] }) : null;
-  function playItem(it) {
-    if (S.players.has(it) || $('#v-feed').hidden) return;
-    const m = it.dataset.m, k = coinOf(m), o = k ? optOf(k) : (howOf(m) || INTRO);
-    S.players.set(it, Tok.play(it.querySelector('.vid canvas'), o));
-  }
-  function stopItem(it) { const p = S.players.get(it); if (p) { p.stop(); S.players.delete(it); } }
-  function pauseAll() { S.players.forEach(p => p.stop()); S.players.clear(); }
-  function resume() { const its = $$('#feed .it'); for (const it of its) { const r = it.getBoundingClientRect(); if (r.top > -r.height / 2 && r.top < innerHeight / 2) { playItem(it); break; } } }
-  function burst(v, x, y) { const b = document.createElement('div'); b.className = 'burst'; b.style.left = x + 'px'; b.style.top = y + 'px'; b.innerHTML = ICON.heart; v.appendChild(b); setTimeout(() => b.remove(), 950); }
+    if (e.isIntersecting && e.intersectionRatio > .5) { if (!S.players.has(it) && S.players.size < 6) { const k = coinOf(m); if (k) S.players.set(it, Tok.play(it.querySelector('canvas'), optOf(k))); } }
+    else { const p = S.players.get(it); if (p) { p.stop(); S.players.delete(it); } }
+  }), { threshold: [0, .5, 1] }) : null;
+  $$('#sorts button').forEach(b => b.onclick = () => { S.sort = b.dataset.s; $$('#sorts button').forEach(x => x.classList.toggle('on', x === b)); feed(); $('#feed').scrollTo({ left: 0 }); });
+  function arrows() { const r = $('#feed'), w = r.parentNode; w.classList.toggle('st', r.scrollLeft < 8); w.classList.toggle('en', r.scrollLeft + r.clientWidth > r.scrollWidth - 8); }
+  $('#feed').addEventListener('scroll', arrows, { passive: true }); addEventListener('resize', arrows);
+  $('#aL').onclick = () => $('#feed').scrollBy({ left: -$('#feed').clientWidth * .8, behavior: 'smooth' });
+  $('#aR').onclick = () => $('#feed').scrollBy({ left: $('#feed').clientWidth * .8, behavior: 'smooth' });
+
   function pop(btn) { if (!btn) return; btn.classList.remove('pop'); void btn.offsetWidth; btn.classList.add('pop'); }
   async function doLike(m, btn) {
     pop(btn); if (S.liked[m]) return;
-    S.liked[m] = 1; C.store.set('tt-liked', S.liked); btn && btn.classList.add('on');
+    S.liked[m] = 1; C.store.set('tt-liked', S.liked); $$(`[data-m="${m}"] .lk, [data-like="${m}"]`).forEach(b => b.classList.add('on'));
     const r = await C.post('/api/like', { mint: m }).catch(() => null);
-    if (r && r.ok && btn) { btn.querySelector('.n').textContent = fmt(r.likes); const k = coinOf(m); if (k) k.likes = r.likes; }
+    if (r && r.ok) { const k = coinOf(m); if (k) k.likes = r.likes; $$(`[data-m="${m}"] .lk .n, [data-like="${m}"] .n`).forEach(n => n.textContent = fmt(r.likes)); }
     else if (r && !r.ok) C.toast(r.error);
   }
   async function share(k) {
-    const url = k ? location.origin + '/c/' + k.mint : location.origin, text = k ? `$${k.symbol} got a tok` : 'every ticker gets a tok.';
+    const url = location.origin + '/c/' + k.mint, text = `$${k.symbol} got a tok`;
     if (navigator.share) { try { await navigator.share({ title: 'ticktok', text, url }); return; } catch {} }
     C.copy(url);
   }
   async function save(o, btn) {
-    const lab = btn && btn.querySelector('span:last-child'), was = lab && lab.textContent;
+    const lab = btn && (btn.querySelector('.lab') || btn), was = lab && lab.textContent;
     try {
       await Tok.ready(); if (btn) btn.disabled = true;
       const r = await Tok.record(o, 8, p => { if (lab) lab.textContent = Math.round(p * 100) + '%'; });
@@ -110,27 +113,26 @@
     } catch (e) { C.toast(C.human(e)); }
     finally { if (btn) btn.disabled = false; if (lab) lab.textContent = was; }
   }
+  function burst(v, x, y) { const b = document.createElement('div'); b.className = 'burst'; b.style.left = x + 'px'; b.style.top = y + 'px'; b.innerHTML = ICON.heart; v.appendChild(b); setTimeout(() => b.remove(), 950); }
 
-  // ---------- a coin's details: the right panel on wide screens, a sheet on phones ----------
+  // ---------- one coin: its tok playing, plus everything about it ----------
   async function loadDetail(m) {
     const c = S.kid.get(m); if (c && Date.now() - c.at < 30000) return c.j;
     const j = await C.get('/api/kid?mint=' + m).catch(() => null);
     if (j && j.ok) S.kid.set(m, { at: Date.now(), j }); return j;
   }
+  const kOf = m => { const c = S.kid.get(m); return (c && c.j && c.j.coin) || coinOf(m); };
   function detailHtml(m) {
-    const c = S.kid.get(m), k = (c && c.j && c.j.coin) || coinOf(m); if (!k) return '<p class="mut">Loading…</p>';
-    const j = c && c.j, gods = (k.gods || []), st = k.status && k.status !== 'live' ? 'unborn' : k.state;
-    const comments = (j && j.comments) || [];
-    return `<div class="dh"><canvas id="dAva"></canvas><div><b>${esc(k.name)}</b><span>$${esc(k.symbol)} · ${LABEL[st] || st}</span></div></div>
+    const k = kOf(m); if (!k) return '<p class="mut">Loading…</p>';
+    const c = S.kid.get(m), j = c && c.j, gods = k.gods || [], st = k.status && k.status !== 'live' ? 'unborn' : k.state, comments = (j && j.comments) || [];
+    return `<div class="dh"><b>${esc(k.name)}</b><span>$${esc(k.symbol)} · ${LABEL[st] || st}</span></div>
       <dl class="dstat"><div><dt>mcap</dt><dd>${usd(k)}</dd></div><div><dt>likes</dt><dd>${fmt(k.likes)}</dd></div><div><dt>to pay out</dt><dd>${C.sol(k.vault_lamports || 0)}</dd></div></dl>
-      <div class="mut" style="font-size:12px">first viewers</div><div class="vw">${Array.from({ length: 8 }, (_, i) => `<i class="${i < gods.length ? 'on' : ''}" title="${gods[i] ? C.short(gods[i].wallet) : ''}"></i>`).join('')}</div>
-      <div class="dbtn" style="margin-top:14px"><a class="btn sm acc" href="https://pump.fun/coin/${k.mint}" target="_blank" rel="noopener">pump.fun ↗</a><a class="btn sm" href="https://dexscreener.com/solana/${k.mint}" target="_blank" rel="noopener">chart ↗</a><button class="btn sm" type="button" data-copy="${k.mint}">copy CA</button><button class="btn sm" type="button" data-pay="${k.mint}" ${k.status === 'live' ? '' : 'disabled'}>pay out</button></div>
-      <div class="cmts">${comments.length ? comments.map(x => `<div class="cm"><q>${esc(x.q || '')}</q><p>${esc(x.text)}</p></div>`).join('') : '<p class="mut" style="margin:0;font-size:13px">No replies yet. Comment and it answers.</p>'}</div>
+      <div class="mut sm2">first viewers</div><div class="vw">${Array.from({ length: 8 }, (_, i) => `<i class="${i < gods.length ? 'on' : ''}" title="${gods[i] ? C.short(gods[i].wallet) : ''}"></i>`).join('')}</div>
+      <div class="dbtn"><a class="btn sm acc" href="https://pump.fun/coin/${k.mint}" target="_blank" rel="noopener">pump.fun ↗</a><a class="btn sm" href="https://dexscreener.com/solana/${k.mint}" target="_blank" rel="noopener">chart ↗</a><button class="btn sm" type="button" data-copy="${k.mint}">copy CA</button><button class="btn sm" type="button" data-pay="${k.mint}" ${k.status === 'live' ? '' : 'disabled'}>pay out</button></div>
+      <div class="cmts">${comments.length ? comments.map(x => `<div class="cm"><q>${esc(x.q || '')}</q><p>${esc(x.text)}</p></div>`).join('') : '<p class="mut sm2">No replies yet. Comment and it answers.</p>'}</div>
       <div class="ask"><input class="in" maxlength="200" placeholder="add a comment…" data-ask="${k.mint}"><button class="btn sm acc" type="button" data-send="${k.mint}">send</button></div>`;
   }
   function wire(root, m) {
-    const k = (S.kid.get(m) && S.kid.get(m).j && S.kid.get(m).j.coin) || coinOf(m);
-    const av = root.querySelector('#dAva'); if (av && k) Tok.still(av, { seed: k.seed, look: 'glitch', symbol: k.symbol });
     $$('[data-copy]', root).forEach(b => b.onclick = () => C.copy(b.dataset.copy));
     $$('[data-pay]', root).forEach(b => b.onclick = async () => { b.disabled = true; try { const r = await Cross.feed(m); if (r) C.toast('Paid out to everyone in its split.'); S.kid.delete(m); } catch (e) { C.toast(C.human(e)); } b.disabled = false; });
     const inp = root.querySelector('[data-ask]'), send = root.querySelector('[data-send]');
@@ -138,23 +140,37 @@
       const q = inp.value.trim(); if (q.length < 2) return; send.disabled = true;
       const r = await C.post('/api/talk', { mint: m, ask: q }).catch(() => null); send.disabled = false;
       if (!r || !r.ok) { C.toast((r && r.error) || 'No reply this time.'); return; }
-      inp.value = ''; const c = S.kid.get(m); if (c && c.j) (c.j.comments = c.j.comments || []).unshift({ q, text: r.text }); renderDetail(m); if (root.closest && root.closest('#sheetBody')) { root.innerHTML = detailHtml(m); wire(root, m); }
+      const c = S.kid.get(m); if (c && c.j) (c.j.comments = c.j.comments || []).unshift({ q, text: r.text });
+      root.innerHTML = detailHtml(m); wire(root, m);
     };
     if (send) { send.onclick = go; inp.addEventListener('keydown', e => { if (e.key === 'Enter') go(); }); }
   }
-  function renderDetail(m) { const el = $('#detail'); if (!el || getComputedStyle($('#panel')).display === 'none') return; el.innerHTML = detailHtml(m); wire(el, m); }
-  async function openDetail(m, sheet) {
+  let sp = null;
+  async function openCoin(m) {
+    const k0 = coinOf(m);
+    C.sheet(k0 ? '$' + k0.symbol : 'coin', `<div class="cs"><div class="csv"><div class="csp"><canvas id="csCv"></canvas></div><div class="csr">
+      <button class="rb" type="button" data-like="${m}" aria-label="Like"><span class="ic">${ICON.heart}</span><span class="n">${fmt(k0 && k0.likes)}</span></button>
+      <button class="rb" type="button" id="csShare" aria-label="Share"><span class="ic">${ICON.share}</span><span class="lab">share</span></button>
+      <button class="rb" type="button" id="csSave" aria-label="Download the tok"><span class="ic">${ICON.dl}</span><span class="lab">save</span></button></div></div><div id="sd"><p class="mut">Loading…</p></div></div>`);
+    if (location.pathname !== '/c/' + m) history.replaceState(null, '', '/c/' + m + location.hash);
+    C.closeSheet.after = () => { if (sp) { sp.stop(); sp = null; } if (location.pathname.startsWith('/c/')) history.replaceState(null, '', '/' + location.hash); };
     await loadDetail(m);
-    if (sheet && getComputedStyle($('#panel')).display === 'none') { const k = coinOf(m); C.sheet(k ? '$' + k.symbol : 'coin', '<div id="sd"></div>'); const sd = $('#sd'); sd.innerHTML = detailHtml(m); wire(sd, m); }
-    else { renderDetail(m); const a = $('#detail [data-ask]'); if (sheet && a) a.focus(); }
+    const k = kOf(m), sd = $('#sd'); if (!sd) return;
+    if (!k) { sd.innerHTML = '<p class="mut">This coin isn’t on ticktok.</p>'; return; }
+    $('#sheetTitle').textContent = '$' + k.symbol;
+    const o = optOf(k); await Tok.ready(); if (!$('#csCv')) return;
+    if (sp) sp.stop(); sp = Tok.play($('#csCv'), o);
+    const lk = $(`[data-like="${m}"]`); if (S.liked[m]) lk.classList.add('on'); lk.querySelector('.n').textContent = fmt(k.likes); lk.onclick = () => doLike(m, lk);
+    $('#csShare').onclick = () => share(k); $('#csSave').onclick = e => save(o, e.currentTarget);
+    const v = $('.csp'); v.addEventListener('dblclick', e => { const r = v.getBoundingClientRect(); burst(v, e.clientX - r.left, e.clientY - r.top); doLike(m, lk); });
+    sd.innerHTML = detailHtml(m); wire(sd, m);
   }
 
   // ---------- launch ----------
   let pv = null;
   const pvOpt = () => ({ seed: S.seed, look: S.look, symbol: ($('#tk').value.trim() || 'TICKER').toUpperCase(), caption: $('#cap').value.trim() || 'pov: your coin just got a tok' });
   function syncPv() { const o = pvOpt(); if (pv) pv.set(o); $('#pvName').textContent = '@' + ($('#nm').value.trim() || 'yourcoin'); $('#pvSym').textContent = '$' + o.symbol; }
-  function startPreview() { Tok.ready().then(() => { if (!pv && !$('#v-launch').hidden) pv = Tok.play($('#pv'), pvOpt()); syncPv(); }); }
-  function stopPreview() { if (pv) { pv.stop(); pv = null; } }
+  seen($('.lprev'), () => Tok.ready().then(() => { if (!pv) pv = Tok.play($('#pv'), pvOpt()); syncPv(); }), () => { if (pv) { pv.stop(); pv = null; } });
   ['line', 'nm', 'tk', 'cap'].forEach(id => $('#' + id).addEventListener('input', syncPv));
   $('#tk').addEventListener('input', e => { const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); if (v !== e.target.value) e.target.value = v; });
   $$('#looks [data-l]').forEach(b => b.onclick = () => { S.look = b.dataset.l; $$('#looks [data-l]').forEach(x => x.classList.toggle('on', x === b)); syncPv(); });
@@ -182,7 +198,7 @@
       const r = await Cross.run({ name, symbol, line, look: S.look, seed: S.seed, caption: $('#cap').value.trim(), x: $('#xh').value.trim(), devBuy: buy.lamports(), onStep: i => Cross.steps(prog, i), onDraw: m => splitBox(m.gods) });
       Cross.steps(prog, Cross.STEPS.length, true);
       const res = $('#goRes'); res.hidden = false;
-      res.innerHTML = `<div class="res"><b>$${esc(symbol)} is live with its first tok.</b>${r.buyNote ? ' ' + esc(r.buyNote) : ''}<br><a href="/c/${r.mint}">See it on For You →</a> · <a href="https://pump.fun/coin/${r.mint}" target="_blank" rel="noopener">pump.fun ↗</a></div>`;
+      res.innerHTML = `<div class="res"><b>$${esc(symbol)} is live with its first tok.</b>${r.buyNote ? ' ' + esc(r.buyNote) : ''}<br><a href="/c/${r.mint}">Open it →</a> · <a href="https://pump.fun/coin/${r.mint}" target="_blank" rel="noopener">pump.fun ↗</a></div>`;
       status('Done.', 'ok'); S.seed = Tok.newSeed(); syncPv(); load();
     } catch (e) { status(esc(C.human(e)) + (e.mint ? ` <a href="/c/${e.mint}">Open it</a>` : ''), 'err'); }
     finally { btn.disabled = false; goLabel(); }
@@ -192,6 +208,7 @@
   function ladder() {
     const R = [['new', '1x', 'from day 0'], ['regular', '1.5x', 'from day 3'], ['fan', '2x', 'from day 10'], ['day one', '3x', 'from day 30']];
     $('#ladder').innerHTML = R.map((r, i) => `<div class="rung"><canvas data-i="${i}"></canvas><b>${r[0]}</b><div class="x">${r[1]}</div><small>${r[2]}</small></div>`).join('');
+    C.reveal($('#viewers'));
     Tok.ready().then(() => $$('#ladder canvas').forEach(c => Tok.still(c, { seed: 'stage-' + c.dataset.i, look: 'glitch', symbol: ['NEW', 'REG', 'FAN', 'DAY1'][c.dataset.i] })));
   }
   const TOK = ['TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA', 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'], CB = 'ComputeBudget111111111111111111111111111111';
@@ -202,7 +219,7 @@
     el.innerHTML = '<h3>Your viewer</h3><p class="mut">Reading…</p>';
     const r = await C.get('/api/born?w=' + C.S.me).catch(() => null);
     if (!r || !r.ok) { el.innerHTML = `<h3>Your viewer</h3><p class="mut">${esc((r && r.error) || 'Didn’t load. Try again.')}</p>`; return; }
-    const l = r.life, min = r.minBurn || 10000, form = label => `<div class="burn"><input class="in" id="bAmt" inputmode="numeric" value="${min}"><button class="btn acc" id="bBtn" type="button">${label}</button></div><p class="mut" style="font-size:13px;margin:8px 0 0">You hold ${r.balance == null ? '—' : Number(r.balance).toLocaleString('en-US')} $TICKTOK. Joining burns at least ${min.toLocaleString('en-US')}.</p><p class="status" id="bSt"></p>`;
+    const l = r.life, min = r.minBurn || 10000, form = label => `<div class="burn"><input class="in" id="bAmt" inputmode="numeric" value="${min}"><button class="btn acc" id="bBtn" type="button">${label}</button></div><p class="mut sm2">You hold ${r.balance == null ? '—' : Number(r.balance).toLocaleString('en-US')} $TICKTOK. Joining burns at least ${min.toLocaleString('en-US')}.</p><p class="status" id="bSt"></p>`;
     if (!l) el.innerHTML = `<h3>Your viewer</h3><div class="big">not watching</div>${form('Burn and start watching')}`;
     else if (l.state === 'dead') el.innerHTML = `<h3>Your viewer</h3><div class="big">left</div><p class="mut">This wallet sold below what it held after joining. Coins it was first viewer of still pay it.</p>${form('Watch again')}`;
     else el.innerHTML = `<h3>Your viewer</h3><div class="big">${esc(l.stage)}</div><dl><div><dt>watching</dt><dd>${Math.floor(l.days || 0)} days</dd></div><div><dt>tickets</dt><dd>${l.mult}x</dd></div><div><dt>next</dt><dd>${l.next ? l.next.stage + ' in ' + Math.ceil(l.next.in) + 'd' : 'top stage'}</dd></div><div><dt>first viewer of</dt><dd>${(l.godchildren || []).length}</dd></div></dl>
@@ -240,27 +257,51 @@
     $('#vtop').innerHTML = `<h3>Longest watching</h3>` + (e.length ? `<table class="tbl"><thead><tr><th>#</th><th>wallet</th><th>stage</th><th>first viewer of</th></tr></thead><tbody>${e.map((x, i) => `<tr><td>${i + 1}</td><td>${C.short(x.wallet)}</td><td>${esc(x.stage)}</td><td>${x.kids}</td></tr>`).join('')}</tbody></table>` : `<p class="mut">${S.board && S.board.life ? 'Nobody is watching yet. The first one stays on top for a while.' : 'Opens when $TICKTOK launches.'}</p>`);
   }
 
-  // ---------- live ----------
-  let births = 0;
-  Live.on('status', up => { $$('.pbox h4 .dot').forEach(d => d.classList.toggle('on', up)); if (!up && !births) $('#births').innerHTML = '<p class="mut" style="margin:0">pump.fun’s live feed is offline right now.</p>'; });
+  // ---------- live from pump.fun: the tape, the hero phones, the new-coins row ----------
+  let born = 0, hold = false;
+  const tape = $('#tape'), fresh = $('#births');
+  fresh.addEventListener('mouseenter', () => { hold = true; }); fresh.addEventListener('mouseleave', () => { hold = false; });
+  Live.on('status', up => {
+    ['#tDot', '#kDot'].forEach(id => $(id).classList.toggle('on', up));
+    if (!up && !born) { tape.innerHTML = '<span class="off">pump.fun’s live feed is offline right now. It reconnects on its own.</span>'; fresh.innerHTML = '<p class="mut">pump.fun’s live feed is offline right now. New coins show here when it’s back.</p>'; }
+  });
   Live.on('birth', b => {
-    births++; $('#bornN').textContent = births.toLocaleString('en-US');
-    const el = $('#births'); if (births === 1) el.innerHTML = '';
-    const d = document.createElement('div'); d.innerHTML = `<b>${esc(b.name || 'unnamed')}</b><span>$${esc(b.symbol || '?')}</span>`; d.style.cursor = 'pointer'; d.title = 'Make its tok'; d.onclick = () => tokAny(b); el.prepend(d); while (el.children.length > 10) el.lastChild.remove();
+    born++; $('#bornN').textContent = born.toLocaleString('en-US');
+    if (born === 1) { tape.innerHTML = ''; fresh.innerHTML = ''; }
+    const s = document.createElement('span'); s.innerHTML = `<b>$${esc(symOf(b))}</b> ${esc(b.name || '')}`; s.onclick = () => tokAny(b); tape.appendChild(s);
+    while (tape.children.length > 40) { tx += tape.firstChild.offsetWidth + 28; tape.firstChild.remove(); }
+    heroBirth(b);
+    if (hold) return;
+    const d = document.createElement('button'); d.type = 'button'; d.className = 'fc';
+    d.innerHTML = `<canvas></canvas><div class="fi"><b>${esc(b.name || symOf(b))}</b><span>$${esc(symOf(b))}</span><em>get its tok →</em></div>`;
+    d.onclick = () => tokAny(b); fresh.prepend(d); Tok.still(d.querySelector('canvas'), anyOpt(b));
+    while (fresh.children.length > 6) fresh.lastChild.remove();
   });
   Live.on('trade', t => {
-    const it = $(`#feed .it[data-m="${t.mint}"]`); if (!it) return;
-    const v = it.querySelector('.vid'), b = document.createElement('div'); b.className = 'tb ' + t.side; b.textContent = t.side === 'buy' ? 'buy ↑' : 'sell ↓'; v.appendChild(b); setTimeout(() => b.remove(), 2300);
+    const it = $(`#feed .tk[data-m="${t.mint}"]`); if (!it) return;
+    const v = it.querySelector('.tv'), b = document.createElement('div'); b.className = 'tb ' + t.side; b.textContent = t.side === 'buy' ? 'buy ↑' : 'sell ↓'; v.appendChild(b); setTimeout(() => b.remove(), 2300);
     const s = it.querySelector('.stp'); if (s && !s.classList.contains('ascended')) { s.className = 'stp alive'; s.innerHTML = '<i></i>live'; }
   });
+  // the tape moves on its own clock; new coins join at the end, the oldest wrap round
+  let tx = 0, last = 0;
+  (function roll(now) {
+    const dt = last ? Math.min(64, now - last) : 16; last = now;
+    const room = tape.parentNode.clientWidth;
+    if (!document.hidden && born && tape.scrollWidth > room && !C.calm) {
+      tx -= dt * 0.045; const f = tape.firstElementChild;
+      if (f && tx + f.offsetWidth + 28 < 0) { tx += f.offsetWidth + 28; tape.appendChild(f); }
+      tape.style.transform = `translate3d(${tx.toFixed(1)}px,0,0)`;
+    }
+    requestAnimationFrame(roll);
+  })(0);
   Live.start();
 
-  // any new coin on pump.fun gets a tok too: preview it and download it (it isn't launched here)
+  // any new coin on pump.fun gets a tok too: watch it and download it (it isn't launched here)
   let anyP = null;
   function tokAny(b) {
-    const sym = String(b.symbol || 'TICKER').replace(/[^A-Za-z0-9]/g, '').slice(0, 10).toUpperCase() || 'TICKER', o = { seed: b.mint, look: Tok.LOOKS[(b.mint || '').length % 4], symbol: sym, caption: `pov: $${sym} just got a tok` };
-    C.sheet('$' + sym + ' · its tok', `<div style="display:grid;gap:12px;justify-items:center"><div class="phone" style="width:240px"><canvas id="anyCv"></canvas></div><p class="mut" style="margin:0;font-size:13px;text-align:center">A tok for ${esc(b.name || sym)}, made from its ticker. Download it and post it anywhere.</p><div class="dbtn" style="width:100%"><button class="btn acc" id="anyDl" type="button">Download</button><a class="btn" href="https://pump.fun/coin/${esc(b.mint)}" target="_blank" rel="noopener">pump.fun ↗</a></div></div>`);
-    Tok.ready().then(() => { if (anyP) anyP.stop(); anyP = Tok.play($('#anyCv'), o); });
+    const o = anyOpt(b), sym = o.symbol;
+    C.sheet('$' + sym + ' · its tok', `<div class="anyw"><div class="phone sm"><canvas id="anyCv"></canvas></div><p class="mut sm2 center">A tok for ${esc(b.name || sym)}, just born on pump.fun. Download it and post it anywhere.</p><div class="dbtn"><button class="btn acc" id="anyDl" type="button">Download</button><a class="btn" href="https://pump.fun/coin/${esc(b.mint)}" target="_blank" rel="noopener">pump.fun ↗</a></div></div>`);
+    Tok.ready().then(() => { if (anyP) anyP.stop(); if ($('#anyCv')) anyP = Tok.play($('#anyCv'), o); });
     $('#anyDl').onclick = e => save(o, e.currentTarget);
     C.closeSheet.after = () => { if (anyP) { anyP.stop(); anyP = null; } };
   }
@@ -268,15 +309,24 @@
   // ---------- load ----------
   function caBox() {
     const m = S.board && S.board.life, el = $('#caBox'); el.hidden = !m; if (!m) return;
-    el.innerHTML = `$TICKTOK<br><span style="color:#fff">${C.short(m, 6)}</span><div class="row"><button type="button" id="caC">copy</button><a href="https://pump.fun/coin/${m}" target="_blank" rel="noopener">buy</a><a href="https://dexscreener.com/solana/${m}" target="_blank" rel="noopener">chart</a></div>`;
+    el.innerHTML = `<span>$TICKTOK</span><code>${C.short(m, 6)}</code><button type="button" id="caC">copy</button><a href="https://pump.fun/coin/${m}" target="_blank" rel="noopener">buy</a><a href="https://dexscreener.com/solana/${m}" target="_blank" rel="noopener">chart</a>`;
     $('#caC').onclick = () => C.copy(m);
   }
+  let first = true;
   async function load() {
     const j = await C.get('/api/board').catch(() => null);
     S.board = j && (j.ok || j.offline) ? j : { coins: [], notes: [], elders: [], lives: { alive: 0 }, open: false };
-    await Tok.ready(); feed(); splitBox(); goLabel(); caBox(); route();
+    await Tok.ready(); feed(); splitBox(); goLabel(); caBox(); me(); vtop();
+    if (first) { first = false; ladder(); const m = location.pathname.match(/^\/c\/([1-9A-HJ-NP-Za-km-z]{32,44})/); if (m) openCoin(m[1]); }
   }
-  C.onWallet(() => { goLabel(); if (!$('#v-viewers').hidden) me(); });
+  C.onWallet(() => { goLabel(); me(); });
   load();
-  setInterval(() => { if (document.hidden) return; C.get('/api/board').then(j => { if (j && j.ok) { const fresh = JSON.stringify((j.coins || []).map(k => [k.mint, k.state, k.caption, k.pushed_at])) !== JSON.stringify(((S.board && S.board.coins) || []).map(k => [k.mint, k.state, k.caption, k.pushed_at])); S.board = j; if (fresh && !$('#v-feed').hidden) feed(); } }).catch(() => {}); }, 60000);
+  setInterval(() => {
+    if (document.hidden) return;
+    C.get('/api/board').then(j => {
+      if (!j || !j.ok) return;
+      const sig = b => JSON.stringify(((b && b.coins) || []).map(k => [k.mint, k.state, k.caption, k.pushed_at]));
+      const changed = sig(j) !== sig(S.board); S.board = j; if (changed) feed(); vtop();
+    }).catch(() => {});
+  }, 60000);
 })();
