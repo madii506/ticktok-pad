@@ -45,23 +45,12 @@
         <button class="rb dl" type="button" aria-label="Download the tok"><span class="ic">${ICON.dl}</span><span>save</span></button>
         <div class="disc"><span></span></div></div></div></article>`;
   }
-  const HOWTO = [
-    { seed: 'how-1', look: 'glitch', symbol: 'LAUNCH', caption: 'launch a coin. it’s born with its own tok.' },
-    { seed: 'how-2', look: 'chart', symbol: 'POST', caption: 'every 6 hours it writes a new caption.' },
-    { seed: 'how-3', look: 'zoom', symbol: 'PUSH', caption: 'every hour the algorithm pushes one to the top.' },
-    { seed: 'how-4', look: 'hearts', symbol: 'VIEW', caption: '8 first viewers earn 15% of its fees forever.' },
-  ];
+  const INTRO = { seed: 'ticktok', look: 'glitch', symbol: 'TICKTOK', caption: 'every ticker gets a tok.' };
   function introHtml() {
-    return HOWTO.map((h, i) => `<article class="it" data-m="how-${i}"><div class="stage"><div class="vid"><canvas></canvas>
-      <div class="badges"><span class="stp unborn"><i></i>how it works · ${i + 1}/4</span></div>
-      <div class="info"><b>ticktok</b><div class="ln">${i === 3 ? 'No coins yet. The feed fills up with real coins as they launch.' : 'Swipe up for the next step.'}</div></div>
-      ${i === 3 || i === 0 ? '<a class="btn acc cta" href="#/launch">Launch the first one</a>' : ''}</div>
-      <div class="rail"><a class="ava" href="#/how"><canvas></canvas><i>?</i></a>
-        <button class="rb shr" type="button"><span class="ic">${ICON.share}</span><span>share</span></button>
-        <button class="rb dl" type="button"><span class="ic">${ICON.dl}</span><span>save</span></button><div class="disc"><span></span></div></div></div></article>`).join('');
+    return `<article class="it" data-m="intro"><div class="stage"><div class="vid"><canvas></canvas>
+      <div class="empty"><a class="btn acc" href="#/launch">Launch the first coin</a><span>No coins yet. For You fills up as coins launch.</span></div></div></div></article>`;
   }
-  const INTRO = HOWTO[0];
-  const howOf = m => { const r = /^how-(\d)$/.exec(m); return r ? HOWTO[+r[1]] : null; };
+  const howOf = m => (m === 'intro' ? INTRO : null);
   const coinOf = m => (S.board && S.board.coins || []).find(k => k.mint === m);
   function feed() {
     pauseAll(); S.players.clear();
@@ -70,10 +59,10 @@
     $$('.it', el).forEach(it => {
       const m = it.dataset.m, k = howOf(m) ? null : coinOf(m), o = k ? optOf(k) : (howOf(m) || INTRO);
       Tok.still(it.querySelector('.vid canvas'), o);
-      Tok.still(it.querySelector('.ava canvas'), { seed: o.seed, look: 'glitch', symbol: o.symbol });
       const like = it.querySelector('.like'); if (like) like.onclick = () => doLike(m, like);
-      it.querySelector('.shr').onclick = () => share(k);
-      it.querySelector('.dl').onclick = e => save(o, e.currentTarget);
+      const sh = it.querySelector('.shr'); if (sh) sh.onclick = () => share(k);
+      const dl = it.querySelector('.dl'); if (dl) dl.onclick = e => save(o, e.currentTarget);
+      const av = it.querySelector('.ava canvas'); if (av) Tok.still(av, { seed: o.seed, look: 'glitch', symbol: o.symbol });
       const cm = it.querySelector('.cmt'); if (cm) cm.onclick = () => openDetail(m, true);
       const v = it.querySelector('.vid'); let lastTap = 0;
       const tap = (x, y) => { if (!k) return; burst(v, x, y); if (!S.liked[m]) doLike(m, like); else pop(like); };
